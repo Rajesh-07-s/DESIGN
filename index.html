@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CabEasy - Compare & Track</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRSq+UY=" crossorigin="" />
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        :root{
+            --primary: #007BFF;
+            --accent: #FF5959;
+            --dark: #0f172a;
+            --bg-light: #f8fafc;
+        }
+
+        body { 
+            background: var(--bg-light); 
+            color: #000000; 
+            font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; 
+        }
+
+        /* Navigation */
+        .nav-btn {
+            padding: 0.5rem 1.2rem;
+            border-radius: 999px;
+            font-weight: 600;
+            color: #fff;
+            transition: all .2s ease;
+            opacity: 0.8;
+        }
+        .nav-btn:hover { opacity: 1; background: rgba(0, 0, 0, 0.1); }
+        .nav-btn-active {
+            background: white;
+            color: var(--primary) !important;
+            opacity: 1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        /* Buttons */
+        .modern-button {
+            display:inline-flex; 
+            align-items:center; 
+            justify-content:center;
+            font-weight:700; 
+            padding:0.8rem 1.5rem; 
+            border-radius:12px;
+            transition: all .2s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .modern-button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .modern-button-primary { background: var(--primary); color: white; }
+        .modern-button-secondary { background: var(--accent); color: white; }
+        .modern-button-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+
+        /* Carousel Background Logic */
+        .hero-bg-container { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: 1.5rem; }
+        .carousel-item { 
+            position:absolute; inset:0; opacity:0; transition: opacity 1000ms ease-in-out; transform: scale(1.05); transition: transform 6s ease, opacity 1s ease;
+        }
+        .carousel-item.active { opacity:1; transform: scale(1); }
+        .carousel-overlay { position: absolute; inset: 0; background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%); z-index: 1; }
+
+        /* Cards */
+        .feature-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        .feature-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); border-color: var(--primary); }
+
+        .testi-card { 
+            background: white; 
+            border-radius: 1rem; 
+            padding: 2rem; 
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* MAP STYLES */
+        #tracking-map {
+            height: 400px;
+            width: 100%;
+            z-index: 1;
+            border-radius: 0.75rem;
+        }
+        
+        .pulse-icon {
+            background-color: rgba(0, 123, 255, 0.5);
+            border-radius: 50%;
+            border: 2px solid #007BFF;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); transform: scale(0.9); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); transform: scale(1); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); transform: scale(0.9); }
+        }
+
+        /* Selected Payment Method Style */
+        .payment-option.selected {
+            border-color: var(--primary);
+            background-color: #eff6ff; /* blue-50 */
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#007BFF',
+                        'accent-red': '#FF5959',
+                        'text-dark': '#0f172a',
+                        'bg-white': '#FFFFFF',
+                        'bg-light': '#f8fafc',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-bg-light min-h-screen font-sans text-text-dark antialiased">
+
+    <nav id="navbar" class="sticky top-0 z-50 bg-gray-900 shadow-xl text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                
+                <a href="#home" class="flex-shrink-0 flex items-center h-16 py-2">
+                    <img src="Logo2.png" alt="CabEasy Logo" class="h-10 w-auto object-contain">
+                </a>
+
+                <div class="hidden md:flex space-x-2 flex-shrink-0" id="nav-links">
+                    <a href="#home" data-nav="home" class="nav-btn">Home</a>
+                    <a href="#compare" data-nav="compare" class="nav-btn">Compare</a>
+                    <a href="#about" data-nav="about" class="nav-btn">About</a>
+                    <a href="#contact" data-nav="contact" class="nav-btn">Contact</a>
+                </div>
+
+                <button id="mobile-menu-btn" class="md:hidden p-2 rounded-md text-white hover:bg-primary-blue focus:outline-none">
+                    <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="md:hidden hidden bg-gray-800 pb-4" id="mobile-menu">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col items-start">
+                <a href="#home" data-nav="home" class="nav-btn w-full text-left mb-2">Home</a>
+                <a href="#compare" data-nav="compare" class="nav-btn w-full text-left mb-2">Compare</a>
+                <a href="#about" data-nav="about" class="nav-btn w-full text-left mb-2">About</a>
+                <a href="#contact" data-nav="contact" class="nav-btn w-full text-left">Contact</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="py-6 min-h-[calc(100vh-4rem)]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            <section id="home-view" class="view hidden">
+                <div class="relative w-full h-[600px] rounded-3xl shadow-2xl overflow-hidden mb-12">
+                    <div id="hero-carousel" class="hero-bg-container">
+                        <div class="carousel-item active">
+                            <img src="cab3.jpg" class="w-full h-full object-cover" alt="City traffic">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="cab2.jpg" class="w-full h-full object-cover" alt="Navigation map">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="cab1.jpg" class="w-full h-full object-cover" alt="Taxi light">
+                        </div>
+                        <div class="carousel-overlay"></div>
+                    </div>
+                    <div class="relative z-10 h-full flex flex-col justify-center px-8 md:px-16 max-w-4xl">
+                        <div class="inline-block">
+                            <span class="bg-blue-600/90 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-4 inline-block backdrop-blur-sm"> #1 Price Comparison Tool</span>
+                        </div>
+                        <h1 class="text-5xl md:text-7xl font-black text-white leading-tight mb-6 drop-shadow-lg">
+                            Stop Overpaying <br> For Your Rides.
+                        </h1>
+                        <p class="text-xl text-gray-200 mb-10 leading-relaxed max-w-xl drop-shadow-md">
+                            Compare fares instantly across Uber, Ola, Rapido, and Namma Yatri. Save money on every trip with one click.
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <a href="#compare" class="modern-button bg-white text-primary-blue hover:bg-gray-100 text-lg px-8 py-4 rounded-full shadow-xl flex gap-2">
+                                Start Comparing
+                            </a>
+                            <a href="#about" class="modern-button bg-transparent border-2 border-white text-white hover:bg-white/20 text-lg px-8 py-4 rounded-full">
+                                How it works
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6 mb-16">
+                    <div class="feature-card group">
+                        <div class="w-12 h-12 bg-blue-100 text-primary-blue rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-gray-900">Cheapest Prices</h3>
+                        <p class="text-gray-500">We scan all major apps in real-time to find you the lowest fare instantly.</p>
+                    </div>
+                    <div class="feature-card group">
+                        <div class="w-12 h-12 bg-red-100 text-accent-red rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2 text-gray-900">Fastest ETA</h3>
+                        <p class="text-gray-500">In a rush? Filter by the nearest driver to get moving immediately.</p>
+                    </div>
+                    <div class="feature-card group">
+                        <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        </div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <h3 class="text-xl font-bold text-gray-900">Live Tracking</h3>
+                            <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">New</span>
+                        </div>
+                        <p class="text-gray-500">Track your ride in real-time on our map once you confirm your booking.</p>
+                    </div>
+                </div>
+
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-8">Trusted by Daily Commuters</h2>
+                    <div class="grid md:grid-cols-3 gap-6 text-left">
+                        <div class="testi-card">
+                            <p class="text-gray-600 mb-6 italic">"I used to open 4 different apps. Now I just use CabEasy. It saves me at least ₹50 on every ride to the office."</p>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-600">AM</div>
+                                <div>
+                                    <p class="font-bold text-sm">Arjun Mishra</p>
+                                    <p class="text-xs text-gray-400">Techie, Bangalore</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="testi-card">
+                            <p class="text-gray-600 mb-6 italic">"The interface is so clean and the search is super fast. I love the new dark mode style!"</p>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-600">SR</div>
+                                <div>
+                                    <p class="font-bold text-sm">Sneha Reddy</p>
+                                    <p class="text-xs text-gray-400">Student</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="testi-card">
+                            <p class="text-gray-600 mb-6 italic">"Finally a tool that puts the user first. No hidden fees, just direct comparison. Highly recommend."</p>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-600">RV</div>
+                                <div>
+                                    <p class="font-bold text-sm">Rahul Verma</p>
+                                    <p class="text-xs text-gray-400">Business Owner</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="compare-view" class="view hidden">
+                <h1 class="text-3xl font-extrabold mb-8 text-gray-800">
+                    Find Your Ride
+                </h1>
+
+                <div class="lg:grid lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg h-fit border border-gray-100 sticky top-24">
+
+                        <h2 class="text-lg font-bold mb-4 pb-2 border-b text-gray-700">Location & Filters</h2>
+
+                        <label class="flex items-center gap-2 mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition">
+                            <input type="checkbox" id="use-current" class="h-4 w-4 text-blue-600 rounded">
+                            <span class="font-medium text-blue-600">📍 Use Current Address</span>
+                        </label>
+
+                        <div class="space-y-4 mb-6">
+                            <div class="relative">
+                                <input type="text" id="pickup-location" placeholder="Enter Pickup Location *" required
+                                    class="w-full p-3.5 pr-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                                <button onclick="startVoiceInput('pickup-location')" class="absolute right-3 top-3.5 text-gray-400 hover:text-primary-blue transition" title="Voice Search">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                                </button>
+                            </div>
+
+                            <div class="relative">
+                                <input type="text" id="drop-location" placeholder="Enter Drop Location *" required
+                                    class="w-full p-3.5 pr-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                                <button onclick="startVoiceInput('drop-location')" class="absolute right-3 top-3.5 text-gray-400 hover:text-primary-blue transition" title="Voice Search">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                                </button>
+                            </div>
+
+                            <button id="search-button"
+                                class="w-full py-3.5 font-bold rounded-xl transition bg-primary-blue text-white hover:bg-blue-700 shadow-lg shadow-blue-200 active:scale-95">
+                                Search Rides 🔍
+                            </button>
+                        </div>
+
+                        <label class="block font-medium mb-2 text-gray-600 text-sm">Max Price: <span id="max-price-display" class="font-bold text-gray-900">₹500</span></label>
+                        <input type="range" id="price-slider" min="100" max="1000" value="500" class="w-full accent-blue-600 mb-6">
+
+                        <div class="mb-6">
+                            <h3 class="font-semibold mb-2 text-gray-700 text-sm">Ride Type <span class="text-red-400">*</span></h3>
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-2 cursor-pointer"><input checked type="checkbox" name="ride-type" value="Taxi" class="rounded text-blue-600"> Taxi</label>
+                                <label class="flex items-center gap-2 cursor-pointer"><input checked type="checkbox" name="ride-type" value="Auto" class="rounded text-blue-600"> Auto</label>
+                                <label class="flex items-center gap-2 cursor-pointer"><input checked type="checkbox" name="ride-type" value="Bike" class="rounded text-blue-600"> Bike</label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-semibold mb-2 text-gray-700 text-sm">Payment Type</h3>
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-2 cursor-pointer"><input checked type="checkbox" name="payment-type" value="Online" class="rounded text-blue-600"> Online</label>
+                                <label class="flex items-center gap-2 cursor-pointer"><input checked type="checkbox" name="payment-type" value="Cash" class="rounded text-blue-600"> Cash</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2">
+                        <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+                            <button data-sort="best" class="tab-button px-6 py-3 font-semibold text-sm border-b-2 border-primary-blue text-primary-blue whitespace-nowrap">Best Value</button>
+                            <button data-sort="cheapest" class="tab-button px-6 py-3 font-semibold text-sm text-gray-500 hover:text-primary-blue whitespace-nowrap">Cheapest</button>
+                            <button data-sort="fastest" class="tab-button px-6 py-3 font-semibold text-sm text-gray-500 hover:text-primary-blue whitespace-nowrap">Fastest</button>
+                        </div>
+                        <div id="results-list" class="space-y-4"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="payment-view" class="view hidden bg-white p-8 rounded-2xl shadow-xl max-w-lg mx-auto border border-gray-100">
+                <h1 class="text-2xl font-bold mb-6 text-gray-900 text-center">Confirm Booking</h1>
+                <div id="ride-summary" class="bg-blue-50 p-6 rounded-xl mb-8 border border-blue-100 text-center">
+                    <p class="text-gray-600 text-sm uppercase tracking-wide font-semibold mb-1">Selected Ride</p>
+                    <p class="text-xl font-bold text-gray-900 mb-2" id="payment-ride-name">Ride Name</p>
+                    <p class="text-4xl font-black text-primary-blue" id="payment-ride-price">₹0</p>
+                </div>
+
+                <div id="payment-methods" class="space-y-3">
+                    <h2 class="text-sm font-bold text-gray-500 uppercase mb-3">Select Payment Method</h2>
+                    
+                    <button class="payment-option w-full flex items-center p-4 border rounded-xl hover:border-blue-500 hover:bg-blue-50 transition group bg-white">
+                        <span data-lucide="scan" class="mr-3 text-gray-400 group-hover:text-blue-600"></span> 
+                        <span class="font-medium">Pay with UPI</span>
+                    </button>
+                    
+                    <button class="payment-option w-full flex items-center p-4 border rounded-xl hover:border-blue-500 hover:bg-blue-50 transition group bg-white">
+                        <span data-lucide="credit-card" class="mr-3 text-gray-400 group-hover:text-blue-600"></span> 
+                        <span class="font-medium">Card Payment</span>
+                    </button>
+                    
+                    <button class="payment-option w-full flex items-center p-4 border rounded-xl hover:border-blue-500 hover:bg-blue-50 transition group bg-white">
+                        <span data-lucide="wallet" class="mr-3 text-gray-400 group-hover:text-blue-600"></span> 
+                        <span class="font-medium">Cash on Delivery</span>
+                    </button>
+                    
+                    <button id="confirm-payment-btn" class="modern-button modern-button-secondary w-full mt-6 py-4 text-lg shadow-lg shadow-red-200">
+                        Confirm & Book Ride
+                    </button>
+                </div>
+
+                <div id="payment-loader" class="hidden flex flex-col items-center justify-center space-y-6 mt-10">
+                    <div class="loader"></div>
+                    <div class="text-center">
+                        <p class="text-lg font-bold text-gray-900">Confirming...</p>
+                        <p class="text-sm text-gray-500">Connecting you to the nearest driver.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="success-view" class="view hidden bg-white p-0 rounded-2xl shadow-xl max-w-3xl mx-auto overflow-hidden border border-gray-100">
+                <div class="p-6 bg-green-50 border-b border-green-100 flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center gap-2 text-green-700 mb-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><path d="m9 11 3 3L22 4"></path></svg>
+                            <h1 class="text-lg font-bold">Booking Confirmed</h1>
+                        </div>
+                        <p class="text-sm text-gray-600" id="success-ride-details">Your ride is on the way.</p>
+                        <p class="text-xs text-gray-400 mt-1 font-mono bg-white px-2 py-1 rounded inline-block border border-gray-200" id="success-route-display">Loading route...</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-3xl font-black text-gray-900" id="eta-display">2 min</p>
+                        <p class="text-[10px] font-bold uppercase text-gray-400 tracking-wider">ETA</p>
+                    </div>
+                </div>
+
+                <div class="relative h-[450px] bg-gray-100">
+                    <div id="tracking-map" class="h-full w-full"></div>
+                    
+                    <div class="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-2xl z-[1000] flex items-center gap-4 border border-white/50">
+                        <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden border-2 border-blue-100 text-gray-400 shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-bold text-base text-gray-900 truncate" id="driver-name">Assigning Driver...</h3>
+                            <p class="text-xs text-gray-500 font-mono"><span id="driver-vehicle">--</span></p>
+                            <div class="flex items-center mt-1 text-yellow-500 text-xs font-bold">
+                                <span>★ 4.8</span> <span class="text-gray-300 font-normal ml-1">(1.2k rides)</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button class="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 transition shadow-lg shadow-green-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            </button>
+                             <button class="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition shadow-lg shadow-blue-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 text-center bg-gray-50">
+                    <a href="#home" class="inline-flex items-center justify-center font-bold text-gray-600 hover:text-primary-blue transition">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                        Book Another Ride
+                    </a>
+                </div>
+            </section>
+
+            <section id="about-view" class="view hidden py-14 px-6">
+                <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-10 border border-gray-100">
+                    <h1 class="text-5xl font-black text-center text-gray-900 mb-4 tracking-tight">About Cab<span class="text-primary-blue">Easy</span></h1>
+                    <p class="text-center text-gray-500 text-lg max-w-3xl mx-auto mb-12">The smartest way to commute in the city.</p>
+                    
+                    <div class="grid md:grid-cols-4 gap-6 mb-20">
+                        <div class="p-6 bg-blue-50 rounded-2xl text-center border border-blue-100"><h2 class="text-3xl font-black text-primary-blue counter">50K+</h2><p class="text-gray-600 text-sm font-semibold uppercase mt-1">Price Checks</p></div>
+                        <div class="p-6 bg-blue-50 rounded-2xl text-center border border-blue-100"><h2 class="text-3xl font-black text-primary-blue counter">1.4L+</h2><p class="text-gray-600 text-sm font-semibold uppercase mt-1">Rides</p></div>
+                        <div class="p-6 bg-blue-50 rounded-2xl text-center border border-blue-100"><h2 class="text-3xl font-black text-primary-blue counter">₹3.5 Cr</h2><p class="text-gray-600 text-sm font-semibold uppercase mt-1">Savings</p></div>
+                        <div class="p-6 bg-blue-50 rounded-2xl text-center border border-blue-100"><h2 class="text-3xl font-black text-primary-blue counter">98%</h2><p class="text-gray-600 text-sm font-semibold uppercase mt-1">Happy Users</p></div>
+                    </div>
+
+                    <div class="md:grid grid-cols-2 gap-16 items-center mb-20">
+                        <div class="relative">
+                            <div class="absolute -inset-4 bg-gradient-to-r from-blue-200 to-cyan-200 rounded-full blur-3xl opacity-30"></div>
+                            <img src="cab3.jpg" class="relative rounded-2xl shadow-2xl object-cover w-full aspect-video" alt="CabEasy Image">
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-900 mb-6">Our Mission</h2>
+                            <p class="text-gray-600 text-lg mb-6 leading-relaxed">
+                                Commuting shouldn't be complicated. We built CabEasy to bring transparency to the ride-hailing market.
+                            </p>
+                            <ul class="space-y-4 text-gray-600">
+                                <li class="flex items-center gap-3"><span class="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span> No hidden fees</li>
+                                <li class="flex items-center gap-3"><span class="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span> Real-time comparison</li>
+                                <li class="flex items-center gap-3"><span class="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm">✓</span> 100% Free to use</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h2 class="text-3xl font-bold text-center text-gray-900 mb-10">Meet the Team</h2>
+                    <div class="grid md:grid-cols-2 gap-8 mb-20 max-w-2xl mx-auto">
+                        <div class="bg-gray-50 p-8 rounded-2xl text-center hover:bg-white hover:shadow-xl transition border border-gray-100 group">
+                            <img src="Rajesh.jpg" alt="Rajeshs="w-24 h-24 mx-auto rounded-full object-cover shadow-md mb-4 group-hover:scale-110 transition">
+                            <h3 class="text-xl font-bold text-gray-900">Kartik</h>
+                        </div>
+                        <div class="bg-gray-50 p-8 rounded-2xl text-center hover:bg-white hover:shadow-xl transition border border-gray-100 group">
+                            <img src="kartik.jpg" alt="Karthik" class="w-24 h-24 mx-auto rounded-full object-cover shadow-md mb-4 group-hover:scale-110 transition">
+                            <h3 class="text-xl font-bold text-gray-900">Kartik</h>
+                        </div>
+                        <div class="bg-gray-50 p-8 rounded-2xl text-center hover:bg-white hover:shadow-xl transition border border-gray-100 group">
+                            <img src="chandan.jpg" alt="Chandan" class="w-24 h-24 mx-auto rounded-full object-cover shadow-md mb-4 group-hover:scale-110 transition">
+                            <h3 class="text-xl font-bold text-gray-900">Chandan</h3>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="contact-view" class="view hidden py-14 px-6">
+                <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-10 border border-gray-100">
+                    <div class="text-center mb-10">
+                        <h1 class="text-4xl font-black text-gray-900 mb-2">Get In Touch</h1>
+                        <p class="text-gray-500">We'd love to hear from you. Send us a message!</p>
+                    </div>
+                    
+                    <form action="https://formsubmit.co/YOUR_EMAIL_HERE" method="POST" class="space-y-6" id="contact-form">
+                        <input type="hidden" name="_subject" value="New Feedback from CabEasy">
+                        <input type="hidden" name="_captcha" value="false">
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Your Name</label>
+                            <input type="text" name="name" placeholder="John Doe" required 
+                                class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Your Email</label>
+                            <input type="email" name="email" placeholder="john@example.com" required 
+                                class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Message</label>
+                            <textarea name="message" rows="4" placeholder="How can we help you?" required 
+                                class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"></textarea>
+                        </div>
+                        
+                        <button type="submit" class="modern-button modern-button-primary w-full text-lg py-4 shadow-lg shadow-blue-200">
+                            Send Message ✉
+                        </button>
+                        
+                        <p id="contact-message" class="text-center text-green-600 font-bold bg-green-50 p-3 rounded-lg hidden border border-green-100">
+                            ✔ Message sent successfully!
+                        </p>
+                    </form>
+                    </div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer class="bg-gray-900 text-white mt-12 py-8 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="flex items-center justify-center gap-2 mb-2">
+                <img src="Logo2.png" class="h-6 w-auto opacity-80 grayscale hover:grayscale-0 transition">
+                <span class="text-lg font-bold">CabEasy</span>
+            </div>
+            <p class="text-sm text-gray-500">© 2025 All rights reserved. Built for commuters.</p>
+        </div>
+    </footer>
+
+    <script>
+        // MOCK RIDES
+        const mockRides = [
+            { id: 1, name: 'Uber Go', type: 'Taxi', eta: 5, duration: 25, price: 350, payment: 'Online', isBest: true, isFastest: false },
+            { id: 2, name: 'Ola Mini', type: 'Taxi', eta: 8, duration: 30, price: 300, payment: 'Cash', isBest: false, isFastest: false },
+            { id: 3, name: 'Rapido Bike', type: 'Bike', eta: 2, duration: 15, price: 150, payment: 'Online', isBest: true, isFastest: true },
+            { id: 4, name: 'Namma Yatri', type: 'Auto', eta: 6, duration: 20, price: 220, payment: 'Cash', isBest: false, isFastest: false },
+            { id: 5, name: 'UberMoto', type: 'Bike', eta: 3, duration: 12, price: 180, payment: 'Online', isBest: false, isFastest: true },
+            { id: 6, name: 'Ola Auto', type: 'Auto', eta: 10, duration: 25, price: 200, payment: 'Online', isBest: false, isFastest: false },
+            { id: 7, name: 'Uber Premier', type: 'Taxi', eta: 15, duration: 40, price: 550, payment: 'Online', isBest: false, isFastest: false },
+            { id: 8, name: 'Rapido Auto', type: 'Auto', eta: 4, duration: 18, price: 190, payment: 'Cash', isBest: true, isFastest: false },
+            { id: 9, name: 'Namma Yatri', type: 'Taxi', eta: 7, duration: 28, price: 320, payment: 'Online', isBest: false, isFastest: false },
+            { id: 10, name: 'Ola Prime', type: 'Taxi', eta: 12, duration: 35, price: 420, payment: 'Online', isBest: false, isFastest: false },
+        ];
+        
+        // RIDERS DATA
+        const ridersData = [
+          { platform: "Ola", name: "Arvind Kumar", vehicle: "KA 03 J 6729" },
+          { platform: "Ola", name: "Vignesh R", vehicle: "KA 41 T 2355" },
+          { platform: "Uber", name: "Santhosh M", vehicle: "KA 02 B 8891" },
+          { platform: "Uber", name: "Irfan Shaikh", vehicle: "KA 05 Z 1147" },
+          { platform: "Rapido", name: "Naveen H", vehicle: "KA 53 P 9922" },
+          { platform: "Rapido", name: "Pranav Kulkarni", vehicle: "KA 04 L 1770" },
+          { platform: "Namma Yatri", name: "Shreyas Gowda", vehicle: "KA 01 F 6675" },
+          { platform: "Namma Yatri", name: "Manikandan S", vehicle: "KA 09 N 4421" },
+          { platform: "Ola", name: "Bharath Shetty", vehicle: "KA 51 C 3560" },
+          { platform: "Uber", name: "Shashank Jain", vehicle: "KA 34 E 9987" },
+          { platform: "Uber", name: "Deepak Chatterjee", vehicle: "KA 50 M 7724" }
+        ];
+
+        let currentSort = 'best';
+        let hasSearched = false;
+        let isCompareInitialized = false;
+        let isPaymentInitialized = false;
+        let hasRunCounter = false;
+        let mapInstance = null;
+        let driverMarker = null;
+        let routeLine = null;
+        let approachLine = null;
+        let selectedPaymentMethod = null; // Track payment method
+        
+        const userLocation = [13.1633, 77.6169]; 
+        const dropLocation = [13.1346, 77.6144]; 
+        const driverStart = [13.1500, 77.6100];   
+
+        const getUrlParam = (key) => {
+            const hash = window.location.hash.split('?')[1];
+            if (!hash) return null;
+            const params = new URLSearchParams(hash);
+            return params.get(key);
+        };
+        
+        const getDriverForRide = (rideName) => {
+            if (!rideName) return ridersData[0];
+            const target = rideName.includes('Uber') ? 'Uber' :
+                           rideName.includes('Ola') ? 'Ola' :
+                           rideName.includes('Rapido') ? 'Rapido' : 'Namma Yatri';
+            const platformDrivers = ridersData.filter(d => d.platform === target);
+            if(target === 'Uber') {
+                const deepak = platformDrivers.find(d => d.name === "Deepak Chatterjee");
+                if(deepak && Math.random() > 0.5) return deepak; 
+            }
+            if(platformDrivers.length > 0) {
+                return platformDrivers[Math.floor(Math.random() * platformDrivers.length)];
+            }
+            return ridersData[0]; 
+        };
+
+        const getRideIcon = (type) => {
+            switch(type) {
+                case 'Taxi': return '<span data-lucide="car" class="w-5 h-5 text-primary-blue"></span>';
+                case 'Auto': return '<span data-lucide="bus-front" class="w-5 h-5 text-accent-red"></span>';
+                case 'Bike': return '<span data-lucide="bike" class="w-5 h-5 text-text-dark"></span>';
+                default: return '<span data-lucide="route" class="w-5 h-5 text-gray-500"></span>';
+            }
+        }
+
+        window.proceedToPayment = (rideName, price) => {
+            const pick = document.getElementById('pickup-location').value;
+            const drop = document.getElementById('drop-location').value;
+            window.location.hash = `#payment?ride=${encodeURIComponent(rideName)}&price=${price}&from=${encodeURIComponent(pick)}&to=${encodeURIComponent(drop)}`;
+        };
+
+        const renderResults = () => {
+            const resultsContainer = document.getElementById('results-list');
+            if (!resultsContainer) return;
+
+            if (!hasSearched) {
+                resultsContainer.innerHTML = `<div class="bg-gray-50 p-10 rounded-2xl border-2 border-dashed border-gray-300 text-center text-gray-500 italic flex flex-col items-center justify-center h-64">
+                    <div class="bg-blue-100 p-4 rounded-full mb-4 text-primary-blue">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                    </div>
+                    <p>Enter your pickup and drop locations and click <strong class="text-primary-blue">"Search Rides"</strong> to see fares.</p>
+                </div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            const maxPrice = parseInt(document.getElementById('price-slider')?.value || 1000);
+            const selectedRideTypes = Array.from(document.querySelectorAll('input[name="ride-type"]:checked')).map(el => el.value);
+            
+            let filteredRides = mockRides.filter(ride => {
+                const passesPrice = ride.price <= maxPrice;
+                const passesType = selectedRideTypes.includes(ride.type);
+                return passesPrice && passesType;
+            });
+
+            switch(currentSort) {
+                case 'cheapest': filteredRides.sort((a, b) => a.price - b.price); break;
+                case 'fastest': filteredRides.sort((a, b) => a.eta - b.eta); break;
+                case 'best': default:
+                    filteredRides.sort((a, b) => {
+                        if (a.isBest && !b.isBest) return -1;
+                        if (!a.isBest && b.isBest) return 1;
+                        if (a.eta !== b.eta) return a.eta - b.eta;
+                        return a.price - b.price;
+                    });
+                    break;
+            }
+
+            if (filteredRides.length === 0) {
+                resultsContainer.innerHTML = '<div class="bg-red-50 p-8 rounded-xl text-center text-red-500 italic">No rides found matching your criteria. Try widening your search!</div>';
+            } else {
+                resultsContainer.innerHTML = filteredRides.map(ride => `
+                    <div class="ride-card bg-white p-5 rounded-xl shadow-sm hover:shadow-md border border-gray-100 flex justify-between items-center transition duration-300">
+                        <div class="flex items-center space-x-4">
+                            <div class="p-3 rounded-full bg-blue-50">
+                                ${getRideIcon(ride.type)}
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold flex items-center text-gray-900">
+                                    ${ride.name}
+                                    ${ride.isBest ? '<span class="ml-2 text-[10px] font-bold bg-gradient-to-r from-red-500 to-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm">BEST</span>' : ''}
+                                </h3>
+                                <p class="text-xs text-gray-500 font-medium">${ride.type} • ${ride.payment}</p>
+                            </div>
+                        </div>
+                        <div class="text-center hidden sm:block">
+                            <p class="text-base font-bold text-gray-800">${ride.eta} min ETA</p>
+                            <p class="text-xs text-gray-400">${ride.duration} min ride</p>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                            <div class="text-right">
+                                <p class="text-2xl font-black text-primary-blue">₹${ride.price}</p>
+                            </div>
+                            <button onclick="proceedToPayment('${ride.name}', ${ride.price})" class="modern-button bg-primary-blue text-white hover:bg-blue-700 py-2 px-6 rounded-full text-sm shadow-lg shadow-blue-100">Select</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            lucide.createIcons();
+        };
+
+        const initCompareListeners = () => {
+            if (isCompareInitialized) {
+                if(hasSearched) renderResults(); 
+                return;
+            }
+            const slider = document.getElementById('price-slider');
+            const display = document.getElementById('max-price-display');
+            if (slider && display) {
+                slider.addEventListener('input', () => {
+                    display.textContent = `₹${slider.value}`;
+                    if (hasSearched) renderResults(); 
+                });
+            }
+            document.querySelectorAll('input[name="ride-type"], input[name="payment-type"]').forEach(checkbox => {
+                checkbox.addEventListener('change', () => { if (hasSearched) renderResults(); });
+            });
+
+            document.getElementById('search-button')?.addEventListener('click', () => {
+                const pickup = document.getElementById('pickup-location').value.trim();
+                const drop = document.getElementById('drop-location').value.trim();
+                const rideTypes = document.querySelectorAll('input[name="ride-type"]:checked');
+
+                if (!pickup) { alert("⚠️ Please enter a Pickup Location."); return; }
+                if (!drop) { alert("⚠️ Please enter a Drop Location."); return; }
+                if (rideTypes.length === 0) { alert("⚠️ Please select at least one Ride Type (Taxi, Auto, or Bike)."); return; }
+                
+                hasSearched = true;
+                renderResults();
+            });
+
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    currentSort = e.target.dataset.sort;
+                    document.querySelectorAll('.tab-button').forEach(btn => {
+                        btn.classList.remove('border-b-2', 'border-primary-blue', 'text-primary-blue');
+                        btn.classList.add('text-gray-500');
+                    });
+                    e.target.classList.add('border-b-2', 'border-primary-blue', 'text-primary-blue');
+                    e.target.classList.remove('text-gray-500');
+                    if (hasSearched) renderResults();
+                });
+            });
+
+            document.getElementById("use-current")?.addEventListener("change", (e) => {
+                const pick = document.getElementById("pickup-location");
+                if (e.target.checked) {
+                    pick.value = "Fetching current location...";
+                    pick.setAttribute("readonly", true);
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(async (position) => {
+                            const lat = position.coords.latitude;
+                            const lon = position.coords.longitude;
+                            try {
+                                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                                const data = await response.json();
+                                pick.value = data.display_name.split(',').slice(0, 3).join(','); 
+                            } catch (err) { pick.value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`; }
+                        }, (error) => { alert("Location access denied or failed."); e.target.checked = false; pick.value = ""; pick.removeAttribute("readonly"); });
+                    } else { alert("Geolocation is not supported by this browser."); }
+                } else { pick.removeAttribute("readonly"); pick.value = ""; }
+            });
+
+            isCompareInitialized = true;
+            renderResults(); 
+        };
+
+        const initPaymentListeners = () => {
+            document.getElementById('payment-methods').classList.remove('hidden');
+            document.getElementById('payment-loader').classList.add('hidden');
+            
+            const options = document.querySelectorAll('.payment-option');
+            options.forEach(opt => {
+                opt.addEventListener('click', function() {
+                    options.forEach(o => o.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedPaymentMethod = this.innerText.trim();
+                });
+            });
+
+            if(isPaymentInitialized) return;
+            
+            const confirmBtn = document.getElementById('confirm-payment-btn');
+            const loader = document.getElementById('payment-loader');
+            const methods = document.getElementById('payment-methods');
+            
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', () => {
+                    if (!selectedPaymentMethod) {
+                        alert("⚠️ Please select a payment method to proceed.");
+                        return;
+                    }
+                    
+                    methods.classList.add('hidden');
+                    loader.classList.remove('hidden');
+                    setTimeout(() => {
+                        const ride = getUrlParam('ride');
+                        const price = getUrlParam('price');
+                        const from = getUrlParam('from');
+                        const to = getUrlParam('to');
+                        window.location.hash = `#success?ride=${ride}&price=${price}&from=${from}&to=${to}`;
+                    }, 3000);
+                });
+            }
+            isPaymentInitialized = true;
+        };
+
+        const initTrackingMap = (fromText, toText) => {
+            if (mapInstance) { mapInstance.remove(); }
+            mapInstance = L.map('tracking-map').setView(userLocation, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(mapInstance);
+
+            const userIcon = L.divIcon({ className: 'pulse-icon', iconSize: [20, 20] });
+            L.marker(userLocation, {icon: userIcon}).addTo(mapInstance).bindPopup(`Pickup: ${fromText}`).openPopup();
+            L.marker(dropLocation).addTo(mapInstance).bindPopup(`Drop: ${toText}`);
+            
+            routeLine = L.polyline([userLocation, dropLocation], { color: '#007BFF', dashArray: '10, 10', weight: 4, opacity: 0.7 }).addTo(mapInstance);
+            mapInstance.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
+
+            approachLine = L.polyline([driverStart, userLocation], { color: '#64748b', dashArray: '5, 10', weight: 3, opacity: 0.8 }).addTo(mapInstance);
+
+            const driverIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/75/75800.png', iconSize: [30, 30], iconAnchor: [15, 15] });
+            driverMarker = L.marker(driverStart, {icon: driverIcon}).addTo(mapInstance);
+            simulateDriverMovement();
+        };
+
+        const simulateDriverMovement = () => {
+            let progress = 0;
+            const duration = 200; 
+            const move = setInterval(() => {
+                progress += 1;
+                if (progress > duration) {
+                    clearInterval(move);
+                    const etaDisplay = document.getElementById('eta-display');
+                    if(etaDisplay) {
+                        etaDisplay.innerText = "Arrived";
+                        etaDisplay.classList.add('text-green-500');
+                    }
+                    return;
+                }
+                const lat = driverStart[0] + (userLocation[0] - driverStart[0]) * (progress / duration);
+                const lng = driverStart[1] + (userLocation[1] - driverStart[1]) * (progress / duration);
+                
+                const newPos = [lat, lng];
+                if(driverMarker) driverMarker.setLatLng(newPos);
+                if(approachLine) approachLine.setLatLngs([newPos, userLocation]);
+
+                if(progress % 50 === 0) {
+                    const minsLeft = Math.ceil(2 * (1 - progress/duration));
+                    const etaDisplay = document.getElementById('eta-display');
+                    if(etaDisplay) etaDisplay.innerText = minsLeft + " min";
+                }
+            }, 50); 
+        };
+
+        function startVoiceInput(inputId) {
+            if (!('webkitSpeechRecognition' in window)) {
+                alert("Voice search is not supported in this browser. Try Chrome.");
+                return;
+            }
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'en-US'; 
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            const inputField = document.getElementById(inputId);
+            const originalPlaceholder = inputField.placeholder;
+            inputField.placeholder = "Listening... 🎙️";
+            recognition.start();
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                inputField.value = transcript;
+                inputField.placeholder = originalPlaceholder;
+            };
+            recognition.onerror = (event) => {
+                inputField.placeholder = "Error. Try again.";
+                setTimeout(() => inputField.placeholder = originalPlaceholder, 2000);
+            };
+            recognition.onend = () => {
+                inputField.placeholder = originalPlaceholder;
+            };
+        }
+
+        const notifyContainer = document.createElement('div');
+        notifyContainer.className = "fixed bottom-4 left-4 z-50 flex flex-col gap-2 pointer-events-none";
+        document.body.appendChild(notifyContainer);
+
+        const fakeNotifications = [
+            "🔥 High demand in Indiranagar right now.",
+            "💰 Priya just saved ₹45 on a ride to Airport.",
+            "🚗 15 drivers are active near Jayanagar.",
+            "⚡ Surge pricing active in Whitefield.",
+            "👤 Rahul just booked an Auto via Namma Yatri."
+        ];
+
+        function showNotification() {
+            if(!window.location.hash.includes('home') && !window.location.hash.includes('compare')) return;
+            const text = fakeNotifications[Math.floor(Math.random() * fakeNotifications.length)];
+            const notif = document.createElement('div');
+            notif.className = "bg-white/90 backdrop-blur border border-gray-200 p-3 rounded-lg shadow-xl transform translate-y-10 opacity-0 transition-all duration-500 flex items-center gap-3 w-72";
+            notif.innerHTML = `<div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div><p class="text-xs font-medium text-gray-700">${text}</p>`;
+            notifyContainer.appendChild(notif);
+            setTimeout(() => { notif.classList.remove('translate-y-10', 'opacity-0'); }, 100);
+            setTimeout(() => { notif.classList.add('translate-y-10', 'opacity-0'); setTimeout(() => notif.remove(), 500); }, 4000); 
+        }
+        setInterval(showNotification, 12000);
+
+        const updateNavbar = (viewId) => {
+            const navLinks = document.querySelectorAll('#nav-links a, #mobile-menu a');
+            navLinks.forEach(link => {
+                const dataNav = link.getAttribute('data-nav') || link.getAttribute('href').replace('#', '');
+                link.classList.remove('nav-btn-active');
+                if (dataNav === viewId || (viewId === 'payment' && dataNav === 'compare') || (viewId === 'success' && dataNav === 'compare')) {
+                    link.classList.add('nav-btn-active');
+                }
+            });
+        };
+
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.carousel-item');
+        const dots = document.querySelectorAll('.carousel-dot');
+        const showSlide = (index) => {
+            slides.forEach((slide, i) => { slide.classList.remove('active'); });
+            if (slides[index]) { slides[index].classList.add('active'); }
+        };
+        let carouselInterval;
+        const nextSlide = () => { currentSlide = (currentSlide + 1) % slides.length; showSlide(currentSlide); };
+        const startCarousel = () => { if (slides.length > 1) { stopCarousel(); carouselInterval = setInterval(nextSlide, 5000); } };
+        const stopCarousel = () => { clearInterval(carouselInterval); };
+
+        const router = () => {
+            const hash = window.location.hash.slice(1);
+            const viewKey = hash.split('?')[0] || 'home';
+            const viewId = viewKey.endsWith('-view') ? viewKey : `${viewKey}-view`;
+
+            document.querySelectorAll('.view').forEach(view => view.classList.add('hidden'));
+            const currentView = document.getElementById(viewId);
+            if (currentView) { currentView.classList.remove('hidden'); } else { document.getElementById('home-view').classList.remove('hidden'); }
+
+            updateNavbar(viewKey);
+            
+            if (viewKey === 'home') { showSlide(currentSlide); startCarousel(); } else { stopCarousel(); }
+            
+            if (viewKey === 'compare') { initCompareListeners(); } 
+            else if (viewKey === 'payment') {
+                const rideName = getUrlParam('ride');
+                const price = getUrlParam('price');
+                if (rideName && price) {
+                    document.getElementById('payment-ride-name').textContent = `Ride: ${decodeURIComponent(rideName)}`;
+                    document.getElementById('payment-ride-price').textContent = `Price: ₹${price}`;
+                }
+                // Reset payment selection on new load
+                selectedPaymentMethod = null;
+                document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
+                initPaymentListeners();
+            } else if (viewKey === 'success') {
+                const lastRideName = decodeURIComponent(getUrlParam('ride') || 'Taxi');
+                const fromLoc = decodeURIComponent(getUrlParam('from') || 'Pickup');
+                const toLoc = decodeURIComponent(getUrlParam('to') || 'Drop');
+
+                const detailsEl = document.getElementById('success-ride-details');
+                if(detailsEl) detailsEl.innerHTML = `Your <strong>${lastRideName}</strong> is approaching.`;
+                
+                document.getElementById('success-route-display').textContent = `${fromLoc} → ${toLoc}`;
+
+                const assignedDriver = getDriverForRide(lastRideName);
+                document.getElementById('driver-name').textContent = assignedDriver.name;
+                document.getElementById('driver-vehicle').textContent = assignedDriver.vehicle;
+                
+                setTimeout(() => { initTrackingMap(fromLoc, toLoc); }, 100);
+
+            } else if (viewKey === 'contact') {
+                const contactForm = document.getElementById('contact-form');
+                if (contactForm && !contactForm.dataset.listening) {
+                    contactForm.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const btn = this.querySelector('button');
+                        const originalText = btn.innerText;
+                        btn.innerText = "Sending...";
+                        
+                        fetch(this.action, { method: 'POST', body: new FormData(this) })
+                        .then(response => {
+                            document.getElementById('contact-message').classList.remove('hidden');
+                            this.reset();
+                            btn.innerText = originalText;
+                            setTimeout(() => { document.getElementById('contact-message').classList.add('hidden'); }, 4000);
+                        })
+                        .catch(error => { alert("Error sending message."); btn.innerText = originalText; });
+                    });
+                    contactForm.dataset.listening = "true";
+                }
+            } else if (viewKey === 'about' && !hasRunCounter) {
+                document.querySelectorAll(".counter").forEach(counter => {
+                    const animate = () => {
+                        const value = +counter.innerText.replace(/\D/g, ""); let count = 0; const step = Math.ceil(value / 30);
+                        const timer = setInterval(() => { count += step; if (count >= value) { counter.innerText = value.toLocaleString() + "+"; clearInterval(timer); } else { counter.innerText = count.toLocaleString() + "+"; } }, 40);
+                    };
+                    animate();
+                });
+                hasRunCounter = true;
+            }
+            lucide.createIcons();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        window.addEventListener('hashchange', router);
+        window.addEventListener('load', () => {
+            if (!window.location.hash) { window.location.hash = '#home'; }
+            router();
+        });
+    </script>
+</body>
+</html>
